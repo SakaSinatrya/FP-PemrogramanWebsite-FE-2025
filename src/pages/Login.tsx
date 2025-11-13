@@ -1,6 +1,12 @@
+import { Typography } from "@/components/ui/typography";
+
 function Login() {
   return (
-    <div className="text-white text-3xl font-bold">This is the Login Page</div>
+    <div className="">
+      <Typography variant="h2" className="font-bold text-3xl">
+        Login Page
+      </Typography>
+    </div>
   );
 }
 

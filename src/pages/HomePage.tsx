@@ -1,7 +1,11 @@
+import { Typography } from "@/components/ui/typography";
+
 function HomePage() {
   return (
-    <div className="text-white text-3xl font-bold">
-      Welcome to the Home Page
+    <div className="">
+      <Typography variant="h1" className="font-bold text-3xl">
+        Home Page
+      </Typography>
     </div>
   );
 }
