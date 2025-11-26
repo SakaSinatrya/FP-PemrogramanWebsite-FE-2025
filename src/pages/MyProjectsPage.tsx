@@ -122,7 +122,7 @@ export default function MyProjectsPage() {
       <Button
         size="lg"
         className="w-full max-w-xs"
-        onClick={() => navigate("/create-quiz")}
+        onClick={() => navigate("/create-projects")}
       >
         <img src={iconPlus} alt="" className="w-5 h-5 mr-2" />
         Create Your First Game
@@ -299,7 +299,7 @@ export default function MyProjectsPage() {
               Manage your educational games
             </Typography>
           </div>
-          <Button onClick={() => navigate("/create-quiz")}>
+          <Button onClick={() => navigate("/create-projects")}>
             <img src={iconPlus} alt="" className="w-5 h-5 mr-2" />
             New Game
           </Button>

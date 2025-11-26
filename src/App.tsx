@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import ProfilePage from "./pages/ProfilePage";
 import MyProjectsPage from "./pages/MyProjectsPage";
 import CreateQuiz from "./pages/CreateQuiz";
+import CreateProject from "./pages/CreateProject";
 import EditQuiz from "./pages/EditQuiz";
 import Quiz from "./pages/Quiz";
 import ProtectedRoute from "./routes/ProtectedRoutes";
@@ -22,6 +23,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-projects" element={<MyProjectsPage />} />
+          <Route path="/create-projects" element={<CreateProject />} />
           <Route path="/create-quiz" element={<CreateQuiz />} />
           <Route path="/quiz/play/:id" element={<Quiz />} />
           <Route path="/quiz/edit/:id" element={<EditQuiz />} />

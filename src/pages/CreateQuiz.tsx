@@ -139,7 +139,7 @@ function CreateQuiz() {
     try {
       await createQuiz(parseResult.data);
       toast.success("Quiz created successfully!");
-      navigate("/my-projects");
+      navigate("/create-projects");
     } catch (err) {
       console.error("Failed to create quiz:", err);
       toast.error("Failed to create quiz. Please try again.");
@@ -153,7 +153,7 @@ function CreateQuiz() {
           size="sm"
           variant="ghost"
           className="hidden md:flex"
-          onClick={() => navigate("/my-projects")}
+          onClick={() => navigate("/create-projects")}
         >
           <ArrowLeft /> Back
         </Button>
@@ -161,7 +161,7 @@ function CreateQuiz() {
           size="sm"
           variant="ghost"
           className="block md:hidden"
-          onClick={() => navigate("/my-projects")}
+          onClick={() => navigate("/create-projects")}
         >
           <ArrowLeft />
         </Button>
@@ -380,7 +380,9 @@ function CreateQuiz() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Keep Editing</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => navigate("/my-projects")}>
+                  <AlertDialogAction
+                    onClick={() => navigate("/create-projects")}
+                  >
                     Discard
                   </AlertDialogAction>
                 </AlertDialogFooter>
