@@ -15,6 +15,17 @@ import {
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 const TOTAL_QUESTIONS_PLACEHOLDER = 15;
@@ -53,6 +64,7 @@ interface GamePlayData {
 const PlayAnagram = () => {
   const { id: game_id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const token = useAuthStore((state) => state.token);
 
   // --- STATE DATA & UI ---
   const [gameData, setGameData] = useState<GamePlayData | null>(null);
@@ -78,6 +90,7 @@ const PlayAnagram = () => {
   const [errorSlotIndex, setErrorSlotIndex] = useState<number | null>(null);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [globalHintsUsed, setGlobalHintsUsed] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
 
   // Track which questions have been answered (by question_id)
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(
@@ -89,6 +102,13 @@ const PlayAnagram = () => {
 
   // Track previous question index to prevent unnecessary re-initialization
   const prevQuestionIndexRef = useRef<number>(-1);
+
+  // --- AUTH CHECK ---
+  useEffect(() => {
+    if (!token) {
+      navigate("/login");
+    }
+  }, [token, navigate]);
 
   // --- LOGIC STOPWATCH ---
   useEffect(() => {
@@ -108,49 +128,58 @@ const PlayAnagram = () => {
     return `${minutes}:${seconds}`;
   };
 
-  const fetchGameData = async (id: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/game/anagram/${id}/play/public`,
-        {
-          method: "GET",
-        },
-      );
+  const fetchGameData = useCallback(
+    async (id: string) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/game/anagram/${id}/play/public`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
 
-      const result = await response.json();
+        const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to load Anagram game data.");
+        if (!response.ok) {
+          throw new Error(
+            result.message || "Failed to load Anagram game data.",
+          );
+        }
+
+        const backendData: BackendGamePlayData = result.data;
+
+        const transformedData: GamePlayData = {
+          game_id: backendData.id,
+          name: backendData.name,
+          questions: backendData.questions.map((q) => ({
+            question_id: q.question_id,
+            correct_word: q.correct_word,
+            scrambled_letters: q.shuffled_letters,
+            image_url: q.image_url,
+            hint_limit: q.hint_limit,
+          })),
+        };
+
+        setGameData(transformedData);
+      } catch (err: unknown) {
+        console.error("Fetch Game Error:", err);
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Unknown error during data fetch.");
+        }
+      } finally {
+        setIsLoading(false);
       }
-
-      const backendData: BackendGamePlayData = result.data;
-
-      const transformedData: GamePlayData = {
-        game_id: backendData.id,
-        name: backendData.name,
-        questions: backendData.questions.map((q) => ({
-          question_id: q.question_id,
-          correct_word: q.correct_word,
-          scrambled_letters: q.shuffled_letters,
-          image_url: q.image_url,
-          hint_limit: q.hint_limit,
-        })),
-      };
-
-      setGameData(transformedData);
-    } catch (err: unknown) {
-      console.error("Fetch Game Error:", err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Unknown error during data fetch.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [token],
+  );
 
   useEffect(() => {
     if (game_id && !hasFetchedRef.current) {
@@ -160,7 +189,7 @@ const PlayAnagram = () => {
       setError("Game ID not found in URL.");
       setIsLoading(false);
     }
-  }, [game_id]);
+  }, [game_id, fetchGameData]);
 
   // Initialize letters when question changes
   useEffect(() => {
@@ -293,11 +322,21 @@ const PlayAnagram = () => {
 
       const letterCount = correctWordNoSpaces.length;
 
-      // Calculate score based on whether user made mistakes
-      // Perfect: letterCount × 2
-      // Wrong input: letterCount × 1
-      const multiplier = hadWrongInput || hintsUsed > 0 ? 1 : 2;
-      const points = letterCount * multiplier;
+      // Calculate score based on hints and mistakes
+      // 1. Perfect (no hints, no mistakes): letterCount × 2
+      // 2. Used hints: letterCount - hintsUsed
+      // 3. Made mistakes but no hints: letterCount × 1
+      let points = 0;
+      if (hintsUsed > 0) {
+        // Kalau pakai hint: panjang huruf - jumlah hint
+        points = letterCount - hintsUsed;
+      } else if (hadWrongInput) {
+        // Kalau ada salah input tapi tidak pakai hint: × 1
+        points = letterCount * 1;
+      } else {
+        // Perfect: × 2
+        points = letterCount * 2;
+      }
 
       setEarnedScore(points);
       setScore((prev: number) => prev + points);
@@ -341,6 +380,7 @@ const PlayAnagram = () => {
     showCorrect,
     hadWrongInput,
     hintsUsed,
+    answeredQuestions,
     findNextUnansweredQuestionIndex,
   ]);
 
@@ -444,23 +484,29 @@ const PlayAnagram = () => {
     const correctWordNoSpaces = currentQuestion.correct_word.replace(/\s/g, "");
     const wordLength = correctWordNoSpaces.length;
 
-    // Logic: < 5 huruf = 1 hint. Setiap 5 huruf berikutnya +1 hint.
-    // Length 4 -> floor(0.8) + 1 = 1
-    // Length 5 -> floor(1) + 1 = 2
-    // Length 10 -> floor(2) + 1 = 3
-    const maxHints = Math.floor((wordLength - 1) / 5) + 1;
+    // Logic: Setiap 5 huruf = 1 hint (dibulatkan ke atas)
+    // Length 1-5 -> 1 hint
+    // Length 6-10 -> 2 hints
+    // Length 11-15 -> 3 hints
+    const maxHints = Math.ceil(wordLength / 5);
 
     if (hintsUsed >= maxHints) return; // Limit reached
 
-    // 2. Cari slot kosong pertama
-    const firstEmptyIndex = answerSlots.findIndex((slot) => slot === null);
-    if (firstEmptyIndex === -1) return; // Full
+    // 2. Cari semua slot kosong dan pilih satu secara random
+    const emptySlotIndices = answerSlots
+      .map((slot, idx) => (slot === null ? idx : -1))
+      .filter((idx) => idx !== -1);
 
-    // 3. Tentukan huruf yang benar
-    const correctLetter = correctWordNoSpaces[firstEmptyIndex];
+    if (emptySlotIndices.length === 0) return; // Semua slot sudah terisi
+
+    // Pilih random slot dari yang kosong
+    const randomEmptySlot =
+      emptySlotIndices[Math.floor(Math.random() * emptySlotIndices.length)];
+
+    // 3. Tentukan huruf yang benar untuk slot tersebut
+    const correctLetter = correctWordNoSpaces[randomEmptySlot];
 
     // 4. Cari huruf tersebut di availableLetters yang belum terpakai
-    // Kita harus mencari index di availableLetters yang cocok
     const availableIndex = availableLetters.findIndex(
       (l) => l.letter.toUpperCase() === correctLetter.toUpperCase() && !l.used,
     );
@@ -468,7 +514,7 @@ const PlayAnagram = () => {
     if (availableIndex !== -1) {
       // Update State
       const newAnswerSlots = [...answerSlots];
-      newAnswerSlots[firstEmptyIndex] = availableLetters[availableIndex].letter;
+      newAnswerSlots[randomEmptySlot] = availableLetters[availableIndex].letter;
       setAnswerSlots(newAnswerSlots);
 
       const newAvailableLetters = [...availableLetters];
@@ -587,13 +633,28 @@ const PlayAnagram = () => {
   };
 
   const handleExit = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to exit the game? Your current score will be lost.",
-      )
-    ) {
-      navigate("/");
+    setShowExitDialog(true);
+  };
+
+  const confirmExit = async () => {
+    setShowExitDialog(false);
+
+    // POST request to increment play count
+    try {
+      await fetch(`${API_BASE_URL}/api/game/play-count`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ game_id }),
+      });
+    } catch (error) {
+      console.error("Failed to update play count:", error);
+      // Continue navigation even if request fails
     }
+
+    navigate("/");
   };
 
   const handlePlayAgain = () => {
@@ -624,7 +685,7 @@ const PlayAnagram = () => {
   let maxHints = 0;
   if (currentQuestion) {
     const len = currentQuestion.correct_word.replace(/\s/g, "").length;
-    maxHints = Math.floor((len - 1) / 5) + 1;
+    maxHints = Math.ceil(len / 5);
   }
 
   // --- LOADING & ERROR STATES ---
@@ -809,50 +870,99 @@ const PlayAnagram = () => {
           </Button>
         </div>
 
-        {/* Slot Jawaban, rounded-full */}
+        {/* Slot Jawaban dengan support multi-word */}
         <div className="flex justify-center gap-2 mb-8 flex-wrap">
-          {answerSlots.map((letter, i) => (
-            <div
-              key={`slot-${i}`}
-              onClick={() => handleSlotClick(i)}
-              className={`relative w-14 h-14 rounded-full flex items-center justify-center font-bold text-2xl transition-all ${
-                i === errorSlotIndex && showError
-                  ? "border-red-500 bg-red-100 animate-shake cursor-not-allowed"
-                  : letter
-                    ? showWrong
-                      ? "bg-red-500 text-white shadow-md"
-                      : showCorrect
-                        ? "bg-green-500 text-white shadow-md"
-                        : "bg-blue-500 text-white shadow-md hover:bg-blue-600 cursor-pointer"
-                    : "border-4 border-dashed border-slate-300 bg-white hover:bg-slate-50 cursor-pointer"
-              }`}
-            >
-              {/* X ICON KALO SALAH PENCET */}
-              {i === errorSlotIndex && showError ? (
-                <X className="w-10 h-10 text-red-600 absolute inset-0 m-auto" />
-              ) : (
-                letter || ""
-              )}
-            </div>
-          ))}
+          {(() => {
+            if (!currentQuestion) return null;
+
+            // Split correct word by spaces to get word groups
+            const words = currentQuestion.correct_word.split(" ");
+            let slotIndex = 0;
+
+            return words.map((word, wordIdx) => (
+              <div key={`word-${wordIdx}`} className="flex gap-2">
+                {word.split("").map(() => {
+                  const i = slotIndex++;
+                  const letter = answerSlots[i];
+
+                  return (
+                    <div
+                      key={`slot-${i}`}
+                      onClick={() => handleSlotClick(i)}
+                      className={`relative w-14 h-14 rounded-full flex items-center justify-center font-bold text-2xl transition-all ${
+                        i === errorSlotIndex && showError
+                          ? "border-red-500 bg-red-100 animate-shake cursor-not-allowed"
+                          : letter
+                            ? showWrong
+                              ? "bg-red-500 text-white shadow-md"
+                              : showCorrect
+                                ? "bg-green-500 text-white shadow-md"
+                                : "bg-blue-500 text-white shadow-md hover:bg-blue-600 cursor-pointer"
+                            : "border-4 border-dashed border-slate-300 bg-white hover:bg-slate-50 cursor-pointer"
+                      }`}
+                    >
+                      {/* X ICON KALO SALAH PENCET */}
+                      {i === errorSlotIndex && showError ? (
+                        <X className="w-10 h-10 text-red-600 absolute inset-0 m-auto" />
+                      ) : (
+                        letter || ""
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ));
+          })()}
         </div>
 
-        {/* Huruf acak */}
-        <div className="flex flex-wrap justify-center gap-3 mb-4">
-          {availableLetters.map((item, i) => (
-            <button
-              key={`scramble-${i}`}
-              onClick={() => handleLetterClick(i)}
-              disabled={item.used || isChecking || showWrong || showCorrect}
-              className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-2xl shadow-lg transition-all ${
-                item.used || showWrong || showCorrect
-                  ? "bg-slate-300 text-slate-400 cursor-not-allowed opacity-50"
-                  : "bg-slate-700 text-white hover:bg-slate-800 hover:scale-110 cursor-pointer active:scale-95"
-              }`}
-            >
-              {item.letter}
-            </button>
-          ))}
+        {/* Huruf acak - dikelompokkan per kata */}
+        <div className="w-full max-w-lg mx-auto">
+          <div className="flex flex-col items-center gap-3 mb-4">
+            {(() => {
+              if (!currentQuestion) return null;
+
+              // Split correct word by spaces to get word groups
+              const words = currentQuestion.correct_word.split(" ");
+              let letterIndex = 0;
+
+              return words.map((word, wordIdx) => {
+                const wordLetterCount = word.length;
+                const wordLetters = availableLetters.slice(
+                  letterIndex,
+                  letterIndex + wordLetterCount,
+                );
+                letterIndex += wordLetterCount;
+
+                return (
+                  <div
+                    key={`word-group-${wordIdx}`}
+                    className="flex gap-2 justify-center"
+                  >
+                    {wordLetters.map((item, localIdx) => {
+                      const globalIdx =
+                        letterIndex - wordLetterCount + localIdx;
+                      return (
+                        <button
+                          key={`scramble-${globalIdx}`}
+                          onClick={() => handleLetterClick(globalIdx)}
+                          disabled={
+                            item.used || isChecking || showWrong || showCorrect
+                          }
+                          className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-2xl shadow-lg transition-all ${
+                            item.used || showWrong || showCorrect
+                              ? "bg-slate-300 text-slate-400 cursor-not-allowed opacity-50"
+                              : "bg-slate-700 text-white hover:bg-slate-800 hover:scale-110 cursor-pointer active:scale-95"
+                          }`}
+                        >
+                          {item.letter}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              });
+            })()}
+          </div>
         </div>
 
         {/* Keyboard hint */}
@@ -917,6 +1027,30 @@ const PlayAnagram = () => {
           )}
         </button>
       </div>
+
+      {/* Exit Confirmation Dialog */}
+      <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-bold text-slate-800">
+              Exit Game?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-slate-600">
+              Are you sure you want to exit the game? Your current score will be
+              lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="px-6 py-2">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmExit}
+              className="bg-red-600 hover:bg-red-700 px-6 py-2"
+            >
+              Exit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

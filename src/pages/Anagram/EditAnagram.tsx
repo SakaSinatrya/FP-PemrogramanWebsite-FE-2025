@@ -238,9 +238,13 @@ const EditAnagram = () => {
       });
 
       // Masukkan file fisik ke formData
-      filesToUpload.forEach((f) => {
-        formData.append("files_to_upload", f);
-      });
+      // IMPORTANT: Append each file separately with the same field name to create an array
+      if (filesToUpload.length > 0) {
+        filesToUpload.forEach((f) => {
+          formData.append("files_to_upload", f);
+        });
+      }
+      // If no new files, don't append files_to_upload at all - backend should handle this
 
       // 4. Buat Payload JSON (FIXED - Logic ID & Image di dalam Map)
       const questionsPayload = questions.map((q, idx) => {
@@ -252,8 +256,6 @@ const EditAnagram = () => {
 
         // A. Masukkan ID Asli (PENTING BUAT EDIT/UPDATE)
         if (q.real_id) {
-          // Note: Cek backend kamu mintanya 'question_id' atau 'id'.
-          // Biasanya untuk update data nested pakai 'question_id' atau 'id'.
           payload.question_id = q.real_id;
         }
 
@@ -262,7 +264,7 @@ const EditAnagram = () => {
           payload.question_image_array_index = questionFileMap[idx];
         }
         // Jika tidak ada gambar baru, field question_image_array_index TIDAK DIKIRIM.
-        // Backend akan otomatis mempertahankan gambar lama.
+        // Backend akan otomatis mempertahankan gambar lama berdasarkan question_id.
 
         return payload;
       });
