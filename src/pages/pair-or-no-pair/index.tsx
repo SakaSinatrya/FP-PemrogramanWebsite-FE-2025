@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
+import api from "@/api/axios";
 
 // Game Item Images
 import catImage from "./images/cat_image_1765100975047.png";
@@ -783,26 +784,21 @@ const PairOrNoPairGame = () => {
 
     const fetchData = async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || "https://api.it-its.id";
-        const apiUrl = `${baseUrl}/api/game/game-type/pair-or-no-pair/${gameId}/play/public`;
-        console.log("[DEBUG] Fetching from:", apiUrl);
+        console.log("[DEBUG] Fetching game data using axios...");
+        const response = await api.get(
+          `/api/game/game-type/pair-or-no-pair/${gameId}/play/public`,
+        );
+        console.log("[DEBUG] API Response:", response.data);
 
-        const response = await fetch(apiUrl);
-        const result = await response.json();
-
-        console.log("[DEBUG] API Response:", JSON.stringify(result, null, 2));
-
-        // API returns: { success: true, data: { items: [...] } }
-        const gameData = result.data;
+        // Axios response is already parsed, data is in response.data.data
+        const gameData = response.data.data;
         console.log("[DEBUG] gameData:", gameData);
         console.log("[DEBUG] items:", gameData?.items);
-        console.log("[DEBUG] items length:", gameData?.items?.length);
 
         if (gameData?.items && gameData.items.length > 0) {
           console.log("[DEBUG] Using API items");
           setItems(gameData.items);
         } else {
-          // API returned empty items, use fallback
           console.warn("[DEBUG] API returned empty items, using fallback data");
           setItems(fallbackItems);
         }
