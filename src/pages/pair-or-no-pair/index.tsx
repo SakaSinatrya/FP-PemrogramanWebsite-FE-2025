@@ -1137,45 +1137,30 @@ const PairOrNoPairGame = () => {
   // 9. FINISH GAME
   const handleFinish = async () => {
     // Sound is handled by useEffect on gameState change
-    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
-
     try {
-      await fetch(`${API_URL}/api/game/play-count`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_id: gameId }),
-      });
+      // Update play count
+      await api.post("/api/game/play-count", { game_id: gameId });
 
       // Submit score to leaderboard
-      const response = await fetch(
-        `${API_URL}/api/game/game-type/pair-or-no-pair/${gameId}/evaluate`,
+      const response = await api.post(
+        `/api/game/game-type/pair-or-no-pair/${gameId}/evaluate`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            score: score,
-            difficulty: difficulty,
-            time_taken: timer,
-          }),
+          score: score,
+          difficulty: difficulty,
+          time_taken: timer,
         },
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data?.rank) {
-          setLeaderboardRank(data.data.rank);
-        }
+      if (response.data?.data?.rank) {
+        setLeaderboardRank(response.data.data.rank);
       }
 
       // Fetch leaderboard list
-      const lbResponse = await fetch(
-        `${API_URL}/api/game/game-type/pair-or-no-pair/${gameId}/leaderboard?difficulty=${difficulty}`,
+      const lbResponse = await api.get(
+        `/api/game/game-type/pair-or-no-pair/${gameId}/leaderboard?difficulty=${difficulty}`,
       );
-      if (lbResponse.ok) {
-        const lbData = await lbResponse.json();
-        if (lbData.data) {
-          setLeaderboardList(lbData.data);
-        }
+      if (lbResponse.data?.data) {
+        setLeaderboardList(lbResponse.data.data);
       }
     } catch (error) {
       console.error("Error updating play count:", error);
