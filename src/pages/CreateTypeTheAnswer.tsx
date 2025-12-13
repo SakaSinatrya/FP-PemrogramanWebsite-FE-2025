@@ -107,7 +107,7 @@ function CreateTypeTheAnswer() {
         formData.append("description", parseResult.data.description);
       }
       formData.append("thumbnail_image", parseResult.data.thumbnail);
-      formData.append("is_published", String(publish));
+      formData.append("is_publish_immediately", String(publish));
       formData.append(
         "time_limit_seconds",
         String(parseResult.data.settings.timeLimitSeconds),
@@ -117,15 +117,12 @@ function CreateTypeTheAnswer() {
         String(parseResult.data.settings.scorePerQuestion),
       );
 
-      // Add questions
-      parseResult.data.questions.forEach((q, index) => {
-        formData.append(`questions[${index}][question_text]`, q.questionText);
-        formData.append(`questions[${index}][correct_answer]`, q.correctAnswer);
-        formData.append(
-          `questions[${index}][question_index]`,
-          String(index + 1),
-        );
-      });
+      // Add questions as JSON string (backend uses StringToObjectSchema)
+      const questionsPayload = parseResult.data.questions.map((q) => ({
+        question_text: q.questionText,
+        correct_answer: q.correctAnswer,
+      }));
+      formData.append("questions", JSON.stringify(questionsPayload));
 
       console.log("Sending FormData to backend...");
       console.log("Endpoint: /api/game/game-type/type-the-answer");

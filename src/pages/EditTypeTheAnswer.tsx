@@ -112,9 +112,12 @@ function EditTypeTheAnswer() {
         );
       } catch (err: unknown) {
         console.error("Failed to fetch game:", err);
-        console.error("Error response:", err.response);
+        const axiosError = err as {
+          response?: { data?: { message?: string } };
+        };
+        console.error("Error response:", axiosError.response);
         const errorMsg =
-          err.response?.data?.message || "Failed to load game data";
+          axiosError.response?.data?.message || "Failed to load game data";
         toast.error(errorMsg);
         setError(`Error: ${errorMsg}`);
         // Don't navigate away immediately, let user see the error
@@ -217,18 +220,16 @@ function EditTypeTheAnswer() {
         console.log("No new thumbnail, keeping existing:", thumbnailUrl);
       }
 
-      formData.append("is_published", String(publish));
+      formData.append("is_publish", String(publish));
       formData.append("time_limit_seconds", String(settings.timeLimitSeconds));
       formData.append("score_per_question", String(settings.scorePerQuestion));
 
-      questions.forEach((q, index) => {
-        formData.append(`questions[${index}][question_text]`, q.questionText);
-        formData.append(`questions[${index}][correct_answer]`, q.correctAnswer);
-        formData.append(
-          `questions[${index}][question_index]`,
-          String(index + 1),
-        );
-      });
+      // Add questions as JSON string (backend uses StringToObjectSchema)
+      const questionsPayload = questions.map((q) => ({
+        question_text: q.questionText,
+        correct_answer: q.correctAnswer,
+      }));
+      formData.append("questions", JSON.stringify(questionsPayload));
 
       await api.put(`/api/game/game-type/type-the-answer/${id}`, formData, {
         headers: {

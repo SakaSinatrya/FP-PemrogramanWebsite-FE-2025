@@ -7,6 +7,7 @@ interface FormFieldPropsWithChildren {
   required?: boolean;
   optionalLabel?: boolean;
   error?: string;
+  className?: string;
   children: React.ReactNode;
 }
 
@@ -16,6 +17,7 @@ interface FormFieldPropsWithInput
   required?: boolean;
   optionalLabel?: boolean;
   error?: string;
+  className?: string;
   children?: never;
 }
 
